@@ -7,6 +7,7 @@ import { initSDK, createInstance, SepoliaConfig } from '@zama-fhe/relayer-sdk/bu
 import { ZAMAGAME_ABI } from '../config/zamagame-abi';
 import monster from '../assets/monster.svg';
 import { ethers } from 'ethers';
+import './Home.css';
 
 type EquipmentView = { index: number; type?: string; attackPower?: number };
 
@@ -48,12 +49,12 @@ export default function Home() {
     }
     (async () => {
       try {
-        setStatus('读取加密装备中...');
+        setStatus('Loading encrypted equipment...');
         const count = await client.readContract({
           address: CONTRACT_ADDRESS as `0x${string}`,
           abi: ZAMAGAME_ABI,
           functionName: 'getPlayerEquipmentCount',
-          args: [address],
+          args: [address as `0x${string}`],
         });
         const n = Number(count);
         setEquipCount(n);
@@ -61,18 +62,18 @@ export default function Home() {
         setStatus('');
       } catch (e) {
         console.error('read count failed', e);
-        setStatus('读取装备数量失败，请检查网络/链');
+        setStatus('Failed to load equipment count, please check network/chain');
       }
     })();
   }, [isConnected, address, client]);
 
   const decryptOne = async (index: number) => {
     if (!instance || !address) {
-      setStatus('解密环境尚未初始化或未连接钱包');
+      setStatus('Decryption environment not initialized or wallet not connected');
       return;
     }
     try {
-      setStatus('读取加密装备中...');
+      setStatus('Loading encrypted equipment...');
       const res = await client.readContract({
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: ZAMAGAME_ABI,
@@ -82,11 +83,11 @@ export default function Home() {
       });
       const [encType, encPower, exists] = res as readonly [`0x${string}`, `0x${string}`, boolean];
       if (!exists) {
-        setStatus('未找到该装备（索引可能超出范围）');
+        setStatus('Equipment not found (index may be out of range)');
         return;
       }
 
-      setStatus('准备签名授权...');
+      setStatus('Preparing signature authorization...');
       const keypair = instance.generateKeypair();
       const startTimeStamp = Math.floor(Date.now() / 1000).toString();
       const durationDays = '7';
@@ -103,7 +104,7 @@ export default function Home() {
         eip712.message
       );
 
-      setStatus('向 Relayer 发起解密请求...');
+      setStatus('Sending decryption request to Relayer...');
       const pairs = [
         { handle: encType as string, contractAddress: CONTRACT_ADDRESS },
         { handle: encPower as string, contractAddress: CONTRACT_ADDRESS },
@@ -123,19 +124,13 @@ export default function Home() {
       const typeVal = Number(result[encType as string]);
       const powerVal = Number(result[encPower as string]);
       setItems((prev) => prev.map((it) => (it.index === index ? { index, type: EQUIP_TYPE_LABELS[typeVal], attackPower: powerVal } : it)));
-      setStatus('解密完成');
+      setStatus('Decryption completed');
     } catch (e) {
       console.error('decrypt failed', e);
-      setStatus('解密失败，请在控制台查看详细错误');
+      setStatus('Decryption failed, please check console for detailed errors');
     }
   };
 
-  const decryptAll = async () => {
-    for (let i = 0; i < equipCount; i++) {
-      // eslint-disable-next-line no-await-in-loop
-      await decryptOne(i);
-    }
-  };
 
   const attack = async () => {
     if (!isConnected) return;
@@ -151,7 +146,7 @@ export default function Home() {
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: ZAMAGAME_ABI,
         functionName: 'getPlayerEquipmentCount',
-        args: [signer.address],
+        args: [address as `0x${string}`],
       });
       const n = Number(count);
       setEquipCount(n);
@@ -164,67 +159,160 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>🏰 ZamaGame - 加密装备RPG</h1>
+    <div className="game-container">
+      <header className="header">
+        <div className="header-content">
+          <h1 className="game-title">🏰 ZamaGame</h1>
+          <p className="game-subtitle">Encrypted Equipment RPG</p>
+        </div>
         <ConnectButton />
       </header>
 
       {!isConnected ? (
-        <main style={{ textAlign: 'center', padding: '2rem 0' }}>
-          <h2>请连接钱包开始游戏</h2>
-          <p>连接你的钱包到Sepolia测试网来体验加密装备RPG游戏</p>
+        <main className="welcome-screen">
+          <div className="welcome-content">
+            <div className="welcome-icon">🗡️</div>
+            <h2 className="welcome-title">Ready for Battle?</h2>
+            <p className="welcome-description">
+              Connect your wallet to the Sepolia testnet and embark on an epic adventure with encrypted NFT equipment!
+            </p>
+            <div className="features-grid">
+              <div className="feature-card">
+                <div className="feature-icon">⚔️</div>
+                <h3>Battle Monsters</h3>
+                <p>Fight epic creatures to earn rare equipment</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">🔒</div>
+                <h3>Encrypted NFTs</h3>
+                <p>All item stats are encrypted on-chain</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">🎒</div>
+                <h3>Collect & Decrypt</h3>
+                <p>Build your inventory and reveal hidden powers</p>
+              </div>
+            </div>
+          </div>
         </main>
       ) : (
-        <main>
-          <section style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1rem', alignItems: 'center', padding: '1rem', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }}>
-            <img src={monster} alt="怪物" width={220} height={200} style={{ objectFit: 'contain' }} />
-            <div>
-              <h2 style={{ margin: '0 0 0.5rem' }}>野外怪物</h2>
-              <p style={{ margin: '0 0 0.5rem', color: '#374151' }}>攻击怪物可以获得加密的随机NFT道具。</p>
-              <p style={{ margin: 0, color: '#6b7280' }}>掉落类型：武器 / 鞋子 / 盾牌（属性与类型在链上加密，需点击解密才能查看）。</p>
-              <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem' }}>
-                <button onClick={attack} disabled={busy}>
-                  {busy ? '攻击中...' : '⚔️ 攻击怪物'}
+        <main className="game-main">
+          <section className="battle-section">
+            <div className="monster-card">
+              <div className="monster-image-container">
+                <img src={monster} alt="Monster" className="monster-image" />
+                <div className="monster-glow"></div>
+              </div>
+              <div className="monster-info">
+                <h2 className="monster-title">🐉 Ancient Dragon</h2>
+                <div className="monster-stats">
+                  <div className="stat">
+                    <span className="stat-label">Level</span>
+                    <span className="stat-value">???</span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">HP</span>
+                    <span className="stat-value">∞</span>
+                  </div>
+                </div>
+                <p className="monster-description">
+                  A legendary creature guarding ancient treasures. Defeat it to claim encrypted equipment with mysterious powers!
+                </p>
+                <div className="loot-info">
+                  <h4>Possible Drops:</h4>
+                  <div className="loot-types">
+                    <span className="loot-type weapon">⚔️ Weapons</span>
+                    <span className="loot-type armor">🛡️ Armor</span>
+                    <span className="loot-type shoes">👟 Shoes</span>
+                  </div>
+                </div>
+                <button className="attack-button" onClick={attack} disabled={busy}>
+                  {busy ? (
+                    <>
+                      <span className="button-spinner"></span>
+                      Battling...
+                    </>
+                  ) : (
+                    <>
+                      ⚔️ Attack Monster
+                      <span className="button-glow"></span>
+                    </>
+                  )}
                 </button>
-                {/* <button onClick={() => decryptAll()} disabled={!equipCount || !instance}>🔓 解密所有掉落</button> */}
               </div>
             </div>
           </section>
 
-          <section>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2>🎒 我的装备 ({equipCount} 件)</h2>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {/* <button onClick={decryptAll} disabled={!equipCount || !instance}>🔓 解密所有装备</button> */}
-                <button onClick={() => {
-                  // 手动刷新计数
-                  if (!address) return;
-                  setStatus('读取加密装备中...');
-                  client.readContract({ address: CONTRACT_ADDRESS as `0x${string}`, abi: ZAMAGAME_ABI, functionName: 'getPlayerEquipmentCount', args: [address] })
-                    .then((count) => {
-                      const n = Number(count);
-                      setEquipCount(n);
-                      setItems(Array.from({ length: n }, (_, i) => ({ index: i })));
-                      setStatus('');
-                    })
-                    .catch((e) => { console.error(e); setStatus('读取失败'); });
-                }}>↻ 刷新</button>
-              </div>
+          <section className="inventory-section">
+            <div className="section-header">
+              <h2 className="section-title">
+                🎒 Your Arsenal
+                <span className="item-count">({equipCount} {equipCount === 1 ? 'item' : 'items'})</span>
+              </h2>
+              <button className="refresh-button" onClick={() => {
+                if (!address) return;
+                setStatus('Loading encrypted equipment...');
+                client.readContract({ address: CONTRACT_ADDRESS as `0x${string}`, abi: ZAMAGAME_ABI, functionName: 'getPlayerEquipmentCount', args: [address] })
+                  .then((count) => {
+                    const n = Number(count);
+                    setEquipCount(n);
+                    setItems(Array.from({ length: n }, (_, i) => ({ index: i })));
+                    setStatus('');
+                  })
+                  .catch((e) => { console.error(e); setStatus('Loading failed'); });
+              }}>
+                <span className="refresh-icon">↻</span> Refresh
+              </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
-              {items.map((it) => (
-                <div key={it.index} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '1rem', background: '#fff' }}>
-                  <h3>装备 #{it.index + 1}</h3>
-                  <p><strong>类型:</strong> {it.type ?? '加密中'}</p>
-                  <p><strong>攻击力:</strong> {it.attackPower ?? '加密中'}</p>
-                  <button onClick={() => decryptOne(it.index)} disabled={!instance}>🔓 解密</button>
-                </div>
-              ))}
-            </div>
-            {status && <p style={{ marginTop: '0.75rem', color: '#374151' }}>{status}</p>}
-            {equipCount === 0 && <p style={{ marginTop: '1rem' }}>还没有装备，快去攻击怪物吧！</p>}
+            {equipCount === 0 ? (
+              <div className="empty-inventory">
+                <div className="empty-icon">📦</div>
+                <h3>Your arsenal awaits!</h3>
+                <p>Battle the dragon above to claim your first encrypted equipment</p>
+              </div>
+            ) : (
+              <div className="equipment-grid">
+                {items.map((it) => (
+                  <div key={it.index} className={`equipment-card ${it.type ? 'decrypted' : 'encrypted'}`}>
+                    <div className="equipment-header">
+                      <h3 className="equipment-title">Equipment #{it.index + 1}</h3>
+                      {it.type && <div className="rarity-badge">✨ Revealed</div>}
+                    </div>
+
+                    <div className="equipment-stats">
+                      <div className="stat-row">
+                        <span className="stat-label">Type:</span>
+                        <span className={`stat-value ${it.type ? 'revealed' : 'hidden'}`}>
+                          {it.type || '🔒 Encrypted'}
+                        </span>
+                      </div>
+                      <div className="stat-row">
+                        <span className="stat-label">Power:</span>
+                        <span className={`stat-value ${it.attackPower ? 'revealed' : 'hidden'}`}>
+                          {it.attackPower || '🔒 Encrypted'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      className="decrypt-button"
+                      onClick={() => decryptOne(it.index)}
+                      disabled={!instance || !!it.type}
+                    >
+                      {it.type ? '✅ Decrypted' : '🔓 Reveal Stats'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {status && (
+              <div className="status-message">
+                <div className="status-icon">⚡</div>
+                <p>{status}</p>
+              </div>
+            )}
           </section>
         </main>
       )}
